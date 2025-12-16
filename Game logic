@@ -58,3 +58,109 @@ class UnoEngine:
             first_card = self.deck.pop()
         self.discard.push(first_card)
         self.log(f"Start Card: {first_card.color} {first_card.value}")
+def get_current_player(self):
+        return self.players.get_current_player()
+
+    def check_playable(self, card):
+        top = self.discard.peek()
+        return (card.color == top.color or 
+                card.value == top.value or 
+                card.color == 'Black')
+
+    def next_turn(self):
+        if self.direction == 1:
+            self.players.move_next()
+        else:
+            self.players.move_prev()
+
+    def handle_special_card(self, card):
+        if card.value == 'Reverse':
+            self.direction *= -1
+            self.log("Direction Reversed!")
+        elif card.value == 'Skip':
+            self.log("Next player skipped!")
+            self.next_turn()
+        elif card.value == 'Draw2':
+            temp_node = self.players.current.next if self.direction == 1 else self.players.current.prev
+            victim = temp_node.data
+            victim.hand.append(self.deck.pop())
+            victim.hand.append(self.deck.pop())
+            self.log(f"{victim.name} drew 2 and skipped!")
+            self.next_turn()
+        elif card.value == 'Wild4':
+            temp_node = self.players.current.next if self.direction == 1 else self.players.current.prev
+            victim = temp_node.data
+            for _ in range(4): victim.hand.append(self.deck.pop())
+            self.log(f"{victim.name} drew 4 and skipped!")
+            self.next_turn()
+
+    def play_card(self, player, card_index, chosen_color=None):
+        card = player.hand.pop(card_index)
+        
+        if card.color == 'Black':
+            if chosen_color:
+                card.color = chosen_color
+                self.log(f"{player.name} changed color to {chosen_color}")
+            else:
+                colors = ['Red', 'Blue', 'Green', 'Yellow']
+                card.color = random.choice(colors)
+                self.log(f"{player.name} (AI) chose {card.color}")
+
+        self.discard.push(card)
+        self.log(f"{player.name} played {card.value}")
+        
+        self.handle_special_card(card)
+        
+        if len(player.hand) == 0:
+            self.game_over = True
+            self.winner = player
+            self.status_msg = f"{player.name} WINS!"
+            return True 
+        
+        self.next_turn()
+        return False
+
+    def draw_card(self, player):
+        if self.deck.is_empty():
+            if self.discard.size() > 1:
+                # Reshuffle Logic
+                top = self.discard.pop()
+                self.deck.items = self.discard.items[:] 
+                self.discard.items = [top] 
+                self.deck.shuffle()
+                self.log("Deck Reshuffled")
+            else:
+                # True Empty Logic
+                self.log("Deck Empty!")
+                self.next_turn()
+                return False # Return False to signal failure
+
+        card = self.deck.pop()
+        player.hand.append(card)
+        self.log(f"{player.name} drew a card")
+        self.next_turn()
+        return True # Return True for success
+
+    def get_ai_move(self):
+        p = self.get_current_player()
+        if not p.is_ai: return None
+
+        playable = []
+        for i, card in enumerate(p.hand):
+            if self.check_playable(card):
+                playable.append(i)
+        
+        if playable:
+            chosen_idx = playable[0]
+            card = p.hand[chosen_idx]
+            chosen_color = None
+            if card.color == 'Black':
+                counts = {'Red':0, 'Blue':0, 'Green':0, 'Yellow':0}
+                for c in p.hand:
+                    if c.color != 'Black': counts[c.color] += 1
+                if not counts: counts = {'Red': 1} 
+                chosen_color = max(counts, key=counts.get)
+            
+            return {'type': 'play', 'idx': chosen_idx, 'color': chosen_color, 'card_obj': card}
+        else:
+            return {'type': 'draw'}
