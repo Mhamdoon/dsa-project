@@ -66,3 +66,158 @@ class ColorChooser(tk.Toplevel):
     def set_color(self, color):
         self.chosen_color = color
         self.destroy()
+
+class UnoGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("UNO - DSA Edition")
+        self.root.geometry("1200x800")
+        
+        self.state = "MENU"
+        self.animating = False
+        self.player_card_widgets = []
+        self.opponent_widgets = {} 
+        
+        self.root.bind("<Configure>", self.on_window_resize)
+        self.show_start_menu()
+
+    def on_window_resize(self, event):
+        if self.state == "MENU":
+            self.draw_menu_content(event.width, event.height)
+        elif self.state == "WIN":
+            self.draw_win_screen_content(event.width, event.height)
+
+    # START MENU
+    def show_start_menu(self):
+        self.state = "MENU"
+
+        self.root.update_idletasks() 
+        for widget in self.root.winfo_children(): widget.destroy()
+        
+        self.root.configure(bg=COLORS['MenuBG']) 
+        self.menu_canvas = tk.Canvas(self.root, bg=COLORS['MenuBG'], highlightthickness=0)
+        self.menu_canvas.pack(fill="both", expand=True)
+        
+        self.draw_menu_content(self.root.winfo_width(), self.root.winfo_height())
+        self.menu_canvas.bind("<Button-1>", self.check_menu_click)
+
+    def draw_menu_content(self, w, h):
+        if w < 100 or h < 100: return
+        self.menu_canvas.delete("all")
+        cx, cy = w / 2, h / 2
+
+        # Clouds
+        for i in range(6):
+            x = (i * 200) % w
+            y = (i * 70 + 50) % (h // 2)
+            self.menu_canvas.create_oval(x, y, x+150, y+60, fill="white", outline="")
+            self.menu_canvas.create_oval(x+50, y-20, x+200, y+50, fill="white", outline="")
+
+        # Decoration Cards
+        self.draw_pixel_card(self.menu_canvas, cx - 350, cy, COLORS['Red'], "1")
+        self.draw_pixel_card(self.menu_canvas, cx - 250, cy - 100, COLORS['Yellow'], "⇄", small=True)
+        self.draw_pixel_card(self.menu_canvas, cx + 250, cy, COLORS['Blue'], "+2")
+        self.draw_pixel_card(self.menu_canvas, cx + 180, cy - 120, COLORS['Green'], "⊘", small=True)
+
+        # Title
+        title_text = "PIXEL UNO"
+        self.menu_canvas.create_text(cx+5, cy - 150, text=title_text, font=("Courier New", 60, "bold"), fill="#C0C0C0")
+        self.menu_canvas.create_text(cx, cy - 155, text=title_text, font=("Courier New", 60, "bold"), fill="#FFD700")
+
+        # Stone Play Button (Reverted to Stone style)
+        btn_w, btn_h = 240, 80
+        self.btn_x1, self.btn_y1 = cx - btn_w/2, cy + 50
+        self.btn_x2, self.btn_y2 = cx + btn_w/2, cy + 50 + btn_h
+
+        self.menu_canvas.create_rectangle(self.btn_x1+6, self.btn_y1+6, self.btn_x2+6, self.btn_y2+6, fill="#222", outline="")
+        self.menu_canvas.create_rectangle(self.btn_x1, self.btn_y1, self.btn_x2, self.btn_y2, fill="#EEE", outline="#555", width=4)
+        self.menu_canvas.create_rectangle(self.btn_x1+6, self.btn_y1+6, self.btn_x2-6, self.btn_y2-6, fill="#DDD", outline="")
+        for bx, by in [(self.btn_x1+10, self.btn_y1+10), (self.btn_x2-10, self.btn_y1+10), 
+                       (self.btn_x1+10, self.btn_y2-10), (self.btn_x2-10, self.btn_y2-10)]:
+             self.menu_canvas.create_oval(bx-3, by-3, bx+3, by+3, fill="#888", outline="#555")
+        
+        self.menu_canvas.create_text(cx, cy + 50 + btn_h/2, text="PLAY", font=("Impact", 32), fill="#333")
+
+    def draw_pixel_card(self, canvas, x, y, color, text, small=False):
+        w, h = (60, 90) if small else (100, 150)
+        x1, y1 = x - w/2, y - h/2
+        x2, y2 = x + w/2, y + h/2
+        canvas.create_rectangle(x1, y1, x2, y2, fill="white", outline="black", width=2)
+        canvas.create_rectangle(x1+5, y1+5, x2-5, y2-5, fill=color, outline="")
+        canvas.create_oval(x1+10, y1+h/4, x2-10, y1+h*3/4, fill="white", outline=color)
+        font_size = 20 if small else 40
+        canvas.create_text(x, y, text=text, fill=color, font=("Courier New", font_size, "bold"))
+
+    def check_menu_click(self, event):
+        if self.btn_x1 <= event.x <= self.btn_x2 and self.btn_y1 <= event.y <= self.btn_y2:
+            self.start_game()
+
+    # GAME SETUP
+    def start_game(self):
+        self.state = "GAME"
+        for widget in self.root.winfo_children(): widget.destroy()
+        self.root.configure(bg=COLORS['BG'])
+        self.engine = UnoEngine()
+        self.engine.initialize_game()
+        self.setup_game_layout()
+        self.update_ui()
+
+    def setup_game_layout(self):
+        self.sidebar = tk.Frame(self.root, bg=COLORS['Sidebar'], width=250)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+        tk.Label(self.sidebar, text="GAME LOG", fg="white", bg=COLORS['Sidebar'], font=("Segoe UI", 14, "bold")).pack(pady=20)
+        self.log_container = tk.Frame(self.sidebar, bg=COLORS['Sidebar'])
+        self.log_container.pack(fill="both", expand=True, padx=10)
+        self.log_labels = []
+        for _ in range(8):
+            lbl = tk.Label(self.log_container, text="", fg="#aaa", bg=COLORS['Sidebar'], font=("Consolas", 10), anchor="w")
+            lbl.pack(fill="x", pady=2)
+            self.log_labels.append(lbl)
+        
+        tk.Label(self.sidebar, text="CONTROLS", fg="white", bg=COLORS['Sidebar'], font=("Segoe UI", 12, "bold")).pack(pady=10)
+        btn_style = {"bg": "#444", "fg": "white", "relief": "flat", "font": ("Segoe UI", 10)}
+        tk.Button(self.sidebar, text="Sort by Color", command=lambda: self.sort_hand('color'), **btn_style).pack(fill="x", padx=20, pady=5)
+        tk.Button(self.sidebar, text="Sort by Value", command=lambda: self.sort_hand('value'), **btn_style).pack(fill="x", padx=20, pady=5)
+
+        self.game_area = tk.Frame(self.root, bg=COLORS['BG'])
+        self.game_area.pack(side="right", fill="both", expand=True)
+
+        self.opponents_frame = tk.Frame(self.game_area, bg=COLORS['BG'])
+        self.opponents_frame.place(relx=0.5, rely=0.15, anchor="center")
+
+        self.center_frame = tk.Frame(self.game_area, bg=COLORS['BG'])
+        self.center_frame.place(relx=0.5, rely=0.45, anchor="center")
+
+        # Draw Pile
+        self.draw_pile_frame = tk.Frame(self.center_frame, bg=COLORS['BG'])
+        self.draw_pile_frame.pack(side="left", padx=20)
+        self.draw_pile = tk.Canvas(self.draw_pile_frame, width=120, height=160, bg=COLORS['BG'], highlightthickness=0)
+        self.draw_pile.pack()
+        self.render_deck_visual(False)
+
+        self.draw_pile.bind("<Enter>", lambda e: self.render_deck_visual(True))
+        self.draw_pile.bind("<Leave>", lambda e: self.render_deck_visual(False))
+        self.draw_pile.bind("<Button-1>", lambda e: self.on_draw())
+        
+        self.deck_count_lbl = tk.Label(self.draw_pile_frame, text="Cards: 0", font=("Arial", 10, "bold"), bg=COLORS['BG'], fg="white")
+        self.deck_count_lbl.pack(pady=5)
+
+        self.discard_container = tk.Frame(self.center_frame, bg=COLORS['BG'])
+        self.discard_container.pack(side="left", padx=20)
+
+        self.info_lbl = tk.Label(self.game_area, text="", font=("Impact", 24), bg=COLORS['BG'], fg="white")
+        self.info_lbl.place(relx=0.5, rely=0.65, anchor="center")
+
+        self.hand_area = tk.Frame(self.game_area, bg="#206030", height=220)
+        self.hand_area.pack(side="bottom", fill="x")
+        self.hand_area.pack_propagate(False)
+        tk.Label(self.hand_area, text="YOUR HAND", bg="#206030", fg="#ddd", font=("Segoe UI", 10)).pack(pady=5)
+        self.cards_frame = tk.Frame(self.hand_area, bg="#206030")
+        self.cards_frame.pack(expand=True)
+
+    def render_deck_visual(self, is_hovered):
+        self.draw_pile.delete("all")
+        base_x, base_y = 15, 20
+        w, h = 90, 130
+        layers = 6 if is_hovered else 1
