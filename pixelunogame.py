@@ -4,47 +4,56 @@ import random
 
 # DATA STRUCTURES
 class Node:
-    def _init_(self, data):
+    def __init__(self, data):
         self.data = data
         self.next = None
         self.prev = None
 
 class ActionQueue:
-    def _init_(self, capacity=8):
+    def __init__(self, capacity=8):
         self.items = []
         self.capacity = capacity
+
     def enqueue(self, item):
         if len(self.items) >= self.capacity:
             self.items.pop(0) 
         self.items.append(item)
+
     def get_all(self):
         return self.items
 
 class CardStack:
-    def _init_(self):
+    def __init__(self):
         self.items = []
+
     def push(self, item):
         self.items.append(item)
+
     def pop(self):
         if not self.is_empty():
             return self.items.pop()
         return None
+
     def peek(self):
         if not self.is_empty():
             return self.items[-1]
         return None
+
     def is_empty(self):
         return len(self.items) == 0
+
     def size(self):
         return len(self.items)
+
     def shuffle(self):
         random.shuffle(self.items)
 
 class CircularDoublyLinkedList:
-    def _init_(self):
+    def __init__(self):
         self.head = None
         self.current = None
         self.size = 0
+
     def add_player(self, player):
         new_node = Node(player)
         if not self.head:
@@ -59,10 +68,13 @@ class CircularDoublyLinkedList:
             new_node.next = self.head
             self.head.prev = new_node
         self.size += 1
+
     def get_current_player(self):
         return self.current.data
+
     def move_next(self):
         self.current = self.current.next
+
     def move_prev(self):
         self.current = self.current.prev
 
@@ -70,18 +82,22 @@ class CircularDoublyLinkedList:
 def merge_sort_hand(hand, sort_key='color'):
     if len(hand) <= 1:
         return hand
+
     mid = len(hand) // 2
     left_half = merge_sort_hand(hand[:mid], sort_key)
     right_half = merge_sort_hand(hand[mid:], sort_key)
+
     return merge(left_half, right_half, sort_key)
 
 def merge(left, right, sort_key):
     sorted_list = []
     i = j = 0
+
     def get_val_weight(card):
         if card.value.isdigit(): return int(card.value)
         mapping = {'Skip': 10, 'Reverse': 11, 'Draw2': 12, 'Wild': 13, 'Wild4': 14}
         return mapping.get(card.value, 0)
+
     while i < len(left) and j < len(right):
         condition = False
         if sort_key == 'color':
@@ -93,32 +109,35 @@ def merge(left, right, sort_key):
         else:
              if get_val_weight(left[i]) < get_val_weight(right[j]):
                  condition = True
+        
         if condition:
             sorted_list.append(left[i])
             i += 1
         else:
             sorted_list.append(right[j])
             j += 1
+
     sorted_list.extend(left[i:])
     sorted_list.extend(right[j:])
     return sorted_list
 
-# PART 3: GAME LOGIC
+# GAME LOGIC
 class Card:
-    def _init_(self, color, value):
+    def __init__(self, color, value):
         self.color = color 
         self.value = value
-    def _repr_(self):
+    
+    def __repr__(self):
         return f"{self.color} {self.value}"
 
 class Player:
-    def _init_(self, name, is_ai=False):
+    def __init__(self, name, is_ai=False):
         self.name = name
         self.hand = [] 
         self.is_ai = is_ai
 
 class UnoEngine:
-    def _init_(self):
+    def __init__(self):
         self.deck = CardStack()
         self.discard = CardStack()
         self.players = CircularDoublyLinkedList()
@@ -127,27 +146,35 @@ class UnoEngine:
         self.game_over = False
         self.winner = None
         self.status_msg = "Game Started"
+
     def log(self, msg):
         self.logs.enqueue(msg)
+
     def initialize_game(self):
         colors = ['Red', 'Blue', 'Green', 'Yellow']
         values = [str(i) for i in range(10)] + ['Skip', 'Reverse', 'Draw2'] * 2
+        
         all_cards = []
         for c in colors:
             for v in values:
                 all_cards.append(Card(c, v))
+        
         for _ in range(4): all_cards.append(Card('Black', 'Wild'))
         for _ in range(4): all_cards.append(Card('Black', 'Wild4'))
+        
         self.deck.items = all_cards 
         self.deck.shuffle()
+
         self.players.add_player(Player("You"))
         self.players.add_player(Player("Bot 1", is_ai=True))
         self.players.add_player(Player("Bot 2", is_ai=True))
+
         curr = self.players.head
         for _ in range(3): 
             for _ in range(7): 
                 curr.data.hand.append(self.deck.pop())
             curr = curr.next
+
         first_card = self.deck.pop()
         while first_card.color == 'Black': 
             self.deck.push(first_card)
@@ -155,18 +182,22 @@ class UnoEngine:
             first_card = self.deck.pop()
         self.discard.push(first_card)
         self.log(f"Start Card: {first_card.color} {first_card.value}")
+
     def get_current_player(self):
         return self.players.get_current_player()
+
     def check_playable(self, card):
         top = self.discard.peek()
         return (card.color == top.color or 
                 card.value == top.value or 
                 card.color == 'Black')
+
     def next_turn(self):
         if self.direction == 1:
             self.players.move_next()
         else:
             self.players.move_prev()
+
     def handle_special_card(self, card):
         if card.value == 'Reverse':
             self.direction *= -1
@@ -187,8 +218,10 @@ class UnoEngine:
             for _ in range(4): victim.hand.append(self.deck.pop())
             self.log(f"{victim.name} drew 4 and skipped!")
             self.next_turn()
+
     def play_card(self, player, card_index, chosen_color=None):
         card = player.hand.pop(card_index)
+        
         if card.color == 'Black':
             if chosen_color:
                 card.color = chosen_color
@@ -197,40 +230,51 @@ class UnoEngine:
                 colors = ['Red', 'Blue', 'Green', 'Yellow']
                 card.color = random.choice(colors)
                 self.log(f"{player.name} (AI) chose {card.color}")
+
         self.discard.push(card)
         self.log(f"{player.name} played {card.value}")
+        
         self.handle_special_card(card)
+        
         if len(player.hand) == 0:
             self.game_over = True
             self.winner = player
             self.status_msg = f"{player.name} WINS!"
             return True 
+        
         self.next_turn()
         return False
+
     def draw_card(self, player):
         if self.deck.is_empty():
             if self.discard.size() > 1:
+                # Reshuffle Logic
                 top = self.discard.pop()
                 self.deck.items = self.discard.items[:] 
                 self.discard.items = [top] 
                 self.deck.shuffle()
                 self.log("Deck Reshuffled")
             else:
+                # True Empty Logic
                 self.log("Deck Empty!")
                 self.next_turn()
-                return False
+                return False # Return False to signal failure
+
         card = self.deck.pop()
         player.hand.append(card)
         self.log(f"{player.name} drew a card")
         self.next_turn()
-        return True
+        return True # Return True for success
+
     def get_ai_move(self):
         p = self.get_current_player()
         if not p.is_ai: return None
+
         playable = []
         for i, card in enumerate(p.hand):
             if self.check_playable(card):
                 playable.append(i)
+        
         if playable:
             chosen_idx = playable[0]
             card = p.hand[chosen_idx]
@@ -241,6 +285,7 @@ class UnoEngine:
                     if c.color != 'Black': counts[c.color] += 1
                 if not counts: counts = {'Red': 1} 
                 chosen_color = max(counts, key=counts.get)
+            
             return {'type': 'play', 'idx': chosen_idx, 'color': chosen_color, 'card_obj': card}
         else:
             return {'type': 'draw'}
@@ -255,8 +300,8 @@ COLORS = {
 }
 
 class ModernCard(tk.Canvas):
-    def _init_(self, master, card, width=80, height=120, command=None, state="normal"):
-        super()._init_(master, width=width, height=height, bg=COLORS['BG'], highlightthickness=0)
+    def __init__(self, master, card, width=80, height=120, command=None, state="normal"):
+        super().__init__(master, width=width, height=height, bg=COLORS['BG'], highlightthickness=0)
         self.card = card
         self.command = command
         self.state = state
@@ -270,6 +315,7 @@ class ModernCard(tk.Canvas):
             self.bind("<Button-1>", self.on_click)
             self.bind("<Enter>", self.on_hover)
             self.bind("<Leave>", self.on_leave)
+
     def draw_card(self):
         pad = 2
         self.create_rectangle(pad+3, pad+3, self.width-pad, self.height-pad, fill="white", outline="black", width=1)
@@ -285,6 +331,7 @@ class ModernCard(tk.Canvas):
         corner_font = ("Arial", 10, "bold")
         self.create_text(12, 12, text=text, fill="white", font=corner_font)
         self.create_text(self.width-12, self.height-12, text=text, fill="white", font=corner_font)
+
     def on_click(self, event):
         if self.command and self.state == "normal": self.command()
     def on_hover(self, event):
@@ -293,8 +340,8 @@ class ModernCard(tk.Canvas):
         if self.state == "normal": self.move(tk.ALL, 0, 5)
 
 class ColorChooser(tk.Toplevel):
-    def _init_(self, parent):
-        super()._init_(parent)
+    def __init__(self, parent):
+        super().__init__(parent)
         self.title("Select Color")
         self.geometry("300x120")
         self.configure(bg="#333")
@@ -312,7 +359,7 @@ class ColorChooser(tk.Toplevel):
         self.destroy()
 
 class UnoGUI:
-    def _init_(self, root):
+    def __init__(self, root):
         self.root = root
         self.root.title("UNO - DSA Edition")
         self.root.geometry("1200x800")
@@ -754,7 +801,7 @@ class UnoGUI:
             human.hand = merge_sort_hand(human.hand, key)
             self.update_ui()
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     root = tk.Tk()
     app = UnoGUI(root)
     root.mainloop()
