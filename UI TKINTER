@@ -1,3 +1,68 @@
 import tkinter
 from tkinter import messagebox
 
+COLORS = {
+    'Red': '#FF5555', 'Blue': '#5555FF', 'Green': '#55AA55', 'Yellow': '#FFAA00',
+    'Black': '#333333', 'White': '#FFFFFF', 
+    'BG': '#2E8B57', 'Sidebar': '#1E1E1E',
+    'MenuBG': '#6495ED' 
+}
+
+class ModernCard(tk.Canvas):
+    def _init_(self, master, card, width=80, height=120, command=None, state="normal"):
+        super()._init_(master, width=width, height=height, bg=COLORS['BG'], highlightthickness=0)
+        self.card = card
+        self.command = command
+        self.state = state
+        self.width = width
+        self.height = height
+        self.fill_color = COLORS.get(card.color, '#333')
+        if card.color == "Black" and card.value in ["Wild", "Wild4"]:
+             self.fill_color = "#222"
+        self.draw_card()
+        if state == "normal":
+            self.bind("<Button-1>", self.on_click)
+            self.bind("<Enter>", self.on_hover)
+            self.bind("<Leave>", self.on_leave)
+
+    def draw_card(self):
+        pad = 2
+        self.create_rectangle(pad+3, pad+3, self.width-pad, self.height-pad, fill="white", outline="black", width=1)
+        self.create_rectangle(pad+6, pad+6, self.width-pad-3, self.height-pad-3, fill=self.fill_color, outline="")
+        oval_pad_x, oval_pad_y = 10, 25
+        self.create_oval(oval_pad_x, oval_pad_y, self.width-oval_pad_x, self.height-oval_pad_y, fill="white", outline=self.fill_color)
+        symbols = {'Skip': '⊘', 'Reverse': '⇄', 'Draw2': '+2', 'Wild': '🌈', 'Wild4': '+4'}
+        text = symbols.get(self.card.value, self.card.value)
+        txt_col = self.fill_color
+        if self.card.value in ['Wild', 'Wild4']: txt_col = "black"
+        font_size = 24 if len(text) < 3 else 18
+        self.create_text(self.width/2, self.height/2, text=text, fill=txt_col, font=("Arial Black", font_size))
+        corner_font = ("Arial", 10, "bold")
+        self.create_text(12, 12, text=text, fill="white", font=corner_font)
+        self.create_text(self.width-12, self.height-12, text=text, fill="white", font=corner_font)
+
+    def on_click(self, event):
+        if self.command and self.state == "normal": self.command()
+    def on_hover(self, event):
+        if self.state == "normal": self.move(tk.ALL, 0, -5)
+    def on_leave(self, event):
+        if self.state == "normal": self.move(tk.ALL, 0, 5)
+
+class ColorChooser(tk.Toplevel):
+    def _init_(self, parent):
+        super()._init_(parent)
+        self.title("Select Color")
+        self.geometry("300x120")
+        self.configure(bg="#333")
+        self.chosen_color = None
+        tk.Label(self, text="Choose a Wild Color:", fg="white", bg="#333", font=("Arial", 12)).pack(pady=10)
+        btn_frame = tk.Frame(self, bg="#333")
+        btn_frame.pack()
+        for col in ['Red', 'Blue', 'Green', 'Yellow']:
+            tk.Button(btn_frame, bg=COLORS[col], width=6, height=2, command=lambda c=col: self.set_color(c)).pack(side="left", padx=5)
+        self.transient(parent)
+        self.grab_set()
+        parent.wait_window(self)
+    def set_color(self, color):
+        self.chosen_color = color
+        self.destroy()
