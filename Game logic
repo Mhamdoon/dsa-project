@@ -1,0 +1,60 @@
+class Card:
+    def __init__(self, color, value):
+        self.color = color 
+        self.value = value
+    
+    def __repr__(self):
+        return f"{self.color} {self.value}"
+
+class Player:
+    def __init__(self, name, is_ai=False):
+        self.name = name
+        self.hand = [] 
+        self.is_ai = is_ai
+
+class UnoEngine:
+    def __init__(self):
+        self.deck = CardStack()
+        self.discard = CardStack()
+        self.players = CircularDoublyLinkedList()
+        self.logs = ActionQueue()
+        self.direction = 1 
+        self.game_over = False
+        self.winner = None
+        self.status_msg = "Game Started"
+
+    def log(self, msg):
+        self.logs.enqueue(msg)
+
+    def initialize_game(self):
+        colors = ['Red', 'Blue', 'Green', 'Yellow']
+        values = [str(i) for i in range(10)] + ['Skip', 'Reverse', 'Draw2'] * 2
+        
+        all_cards = []
+        for c in colors:
+            for v in values:
+                all_cards.append(Card(c, v))
+        
+        for _ in range(4): all_cards.append(Card('Black', 'Wild'))
+        for _ in range(4): all_cards.append(Card('Black', 'Wild4'))
+        
+        self.deck.items = all_cards 
+        self.deck.shuffle()
+
+        self.players.add_player(Player("You"))
+        self.players.add_player(Player("Bot 1", is_ai=True))
+        self.players.add_player(Player("Bot 2", is_ai=True))
+
+        curr = self.players.head
+        for _ in range(3): 
+            for _ in range(7): 
+                curr.data.hand.append(self.deck.pop())
+            curr = curr.next
+
+        first_card = self.deck.pop()
+        while first_card.color == 'Black': 
+            self.deck.push(first_card)
+            self.deck.shuffle()
+            first_card = self.deck.pop()
+        self.discard.push(first_card)
+        self.log(f"Start Card: {first_card.color} {first_card.value}")
