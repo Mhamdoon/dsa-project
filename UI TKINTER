@@ -221,3 +221,271 @@ class UnoGUI:
         base_x, base_y = 15, 20
         w, h = 90, 130
         layers = 6 if is_hovered else 1
+ for i in range(layers):
+            offset = i * 2 if is_hovered else 0
+            x = base_x - offset
+            y = base_y - offset
+            
+            # Card Body
+            self.draw_pile.create_rectangle(x, y, x+w, y+h, fill="#e74c3c", outline="white", width=2)
+            
+            # Add side striations for 3D effect
+            if i < layers - 1 and is_hovered:
+                 self.draw_pile.create_line(x+w, y+h-5, x+w, y+h-15, fill="#444", width=1)
+                 self.draw_pile.create_line(x+w-5, y+h, x+w-15, y+h, fill="#444", width=1)
+
+            # Decoration (only on top card)
+            if i == layers - 1:
+                self.draw_pile.create_oval(x+15, y+30, x+75, y+100, outline="yellow", width=2)
+                self.draw_pile.create_text(x+45, y+65, text="UNO", fill="yellow", font=("Arial Black", 14, "italic"))
+
+    def update_ui(self):
+        logs = self.engine.logs.get_all()
+        for i, lbl in enumerate(self.log_labels):
+            lbl.config(text=f"> {logs[i]}" if i < len(logs) else "")
+
+        curr_p = self.engine.get_current_player()
+        arrow = "➜" if self.engine.direction == 1 else "⬅"
+        if curr_p.name == "You":
+            self.info_lbl.config(text=f"YOUR TURN {arrow}", fg="#88FF88")
+        else:
+            self.info_lbl.config(text=f"{curr_p.name.upper()}'S TURN {arrow}", fg="white")
+
+        self.deck_count_lbl.config(text=f"Cards: {self.engine.deck.size()}")
+
+        for widget in self.opponents_frame.winfo_children(): widget.destroy()
+        self.opponent_widgets = {}
+        temp = self.engine.players.head
+        for _ in range(self.engine.players.size):
+            p = temp.data
+            if p.name != "You":
+                f = tk.Frame(self.opponents_frame, bg=COLORS['BG'], padx=30)
+                f.pack(side="left")
+                self.opponent_widgets[p.name] = f
+                canv = tk.Canvas(f, width=40, height=50, bg=COLORS['BG'], highlightthickness=0)
+                canv.pack()
+                for i in range(3):
+                    o = i * 2
+                    canv.create_rectangle(5+o, 5-o, 35+o, 45-o, fill="#333", outline="white")
+                tk.Label(f, text=p.name, font=("Arial", 11, "bold"), bg=COLORS['BG'], fg="yellow" if p == curr_p else "white").pack()
+                tk.Label(f, text=f"{len(p.hand)} Cards", font=("Arial", 9), bg=COLORS['BG'], fg="#ddd").pack()
+            temp = temp.next
+
+        for widget in self.discard_container.winfo_children(): widget.destroy()
+        if not self.engine.discard.is_empty():
+            ModernCard(self.discard_container, self.engine.discard.peek(), width=100, height=140, state="disabled").pack()
+
+        for widget in self.cards_frame.winfo_children(): widget.destroy()
+        self.player_card_widgets = []
+        human = None
+        t = self.engine.players.head
+        for _ in range(3): 
+            if t.data.name == "You": human = t.data
+            t = t.next
+        if human:
+            is_turn = (curr_p == human)
+            for i, card in enumerate(human.hand):
+                state = "normal" if is_turn and self.engine.check_playable(card) and not self.animating else "disabled"
+                mc = ModernCard(self.cards_frame, card, command=lambda idx=i: self.on_card_click(idx), state=state)
+                mc.pack(side="left", padx=5)
+                self.player_card_widgets.append(mc)
+                if state == "disabled": mc.config(bg="#154020")
+
+        if self.engine.game_over:
+            self.show_win_screen()
+        elif curr_p.is_ai and not self.animating:
+            self.root.after(1200, self.run_ai)
+
+    # WIN SCREEN
+    def show_win_screen(self):
+        self.state = "WIN"
+        self.root.update_idletasks()
+        self.win_canvas = tk.Canvas(self.root, highlightthickness=0)
+        self.win_canvas.place(x=0, y=0, relwidth=1, relheight=1)
+        self.draw_win_screen_content(self.root.winfo_width(), self.root.winfo_height())
+        self.win_canvas.bind("<Button-1>", self.check_win_click)
+        self.animate_win_particles()
+
+    def draw_win_screen_content(self, w, h):
+        self.win_canvas.delete("content")
+        winner_name = self.engine.winner.name
+        is_me = (winner_name == "You")
+        
+        sky_color = "#1a0b2e" if is_me else "#2c0505"
+        self.win_canvas.configure(bg=sky_color)
+        
+        # Mountains
+        self.draw_mountains(self.win_canvas, w, h, base_height=h-100, peak_height=200, color="#111", jaggedness=50)
+        mid_col = "#4b2e83" if is_me else "#500"
+        self.draw_mountains(self.win_canvas, w, h, base_height=h-50, peak_height=120, color=mid_col, jaggedness=30)
+        self.draw_mountains(self.win_canvas, w, h, base_height=h, peak_height=40, color="#222", jaggedness=10)
+
+        cx, cy = w / 2, h / 2 - 50
+        text_main = "YOU WIN!" if is_me else "ELIMINATED"
+        text_sub = f"{winner_name} won the game!" if not is_me else "Victory is yours!"
+        
+        self.win_canvas.create_text(cx+5, cy, text=text_main, font=("Impact", 100), fill="black", tags="content")
+        self.win_canvas.create_text(cx, cy, text=text_main, font=("Impact", 100), fill="white", tags="content")
+        self.win_canvas.create_text(cx, cy+120, text=text_sub, font=("Comic Sans MS", 24, "bold"), fill="white", tags="content")
+
+        btn_w, btn_h = 250, 60
+        self.ret_x1, self.ret_y1 = cx - btn_w/2, cy + 200
+        self.ret_x2, self.ret_y2 = cx + btn_w/2, cy + 200 + btn_h
+        
+        self.win_canvas.create_rectangle(self.ret_x1+5, self.ret_y1+5, self.ret_x2+5, self.ret_y2+5, fill="black", outline="", tags="content")
+        self.win_canvas.create_rectangle(self.ret_x1, self.ret_y1, self.ret_x2, self.ret_y2, fill="#333", outline="white", width=3, tags="content")
+        self.win_canvas.create_text(cx, self.ret_y1 + btn_h/2, text="RETURN TO MENU", font=("Arial", 18, "bold"), fill="white", tags="content")
+
+    def draw_mountains(self, canvas, w, h, base_height, peak_height, color, jaggedness):
+        points = [0, h, 0, base_height]
+        curr_x = 0
+        while curr_x < w:
+            step = random.randint(30, 100)
+            curr_x += step
+            y_var = random.randint(-peak_height, 0)
+            points.append(curr_x)
+            points.append(base_height + y_var)
+        points.extend([w, h, 0, h])
+        canvas.create_polygon(points, fill=color, outline="", tags="mountain")
+
+    def animate_win_particles(self):
+        if self.state != "WIN": return
+        w, h = self.root.winfo_width(), self.root.winfo_height()
+        x = random.randint(0, w)
+        y = h + 10
+        size = random.randint(5, 15)
+        color = random.choice(["white", "yellow", "cyan"])
+        pid = self.win_canvas.create_rectangle(x, y, x+size, y+size, fill=color, outline="", tags="particle")
+        self.move_particle(pid)
+        self.root.after(100, self.animate_win_particles)
+
+    def move_particle(self, pid):
+        if self.state != "WIN": return
+        self.win_canvas.move(pid, 0, -5)
+        coords = self.win_canvas.coords(pid)
+        if coords and coords[1] > -20:
+            self.root.after(50, lambda: self.move_particle(pid))
+        else:
+            self.win_canvas.delete(pid)
+
+    def check_win_click(self, event):
+        if self.ret_x1 <= event.x <= self.ret_x2 and self.ret_y1 <= event.y <= self.ret_y2:
+            self.show_start_menu()
+
+    # INPUT & ANIMATIONS
+    def on_card_click(self, idx):
+        if self.animating: return
+        human = self.engine.get_current_player()
+        if human.name != "You": return
+        card = human.hand[idx]
+        chosen_color = None
+        if card.color == 'Black':
+            chooser = ColorChooser(self.root)
+            if not chooser.chosen_color: return 
+            chosen_color = chooser.chosen_color
+        
+        self.animating = True
+        try:
+            start_widget = self.player_card_widgets[idx]
+            self.animate_fly(start_widget, self.discard_container, lambda: self.finish_play(human, idx, chosen_color))
+        except:
+             self.finish_play(human, idx, chosen_color)
+
+    def finish_play(self, player, idx, color):
+        self.engine.play_card(player, idx, color)
+        self.animating = False
+        self.update_ui()
+
+    def on_draw(self):
+        if self.animating: return
+        human = self.engine.get_current_player()
+        if human.name != "You": return
+        
+        success = self.engine.draw_card(human)
+        if not success:
+            messagebox.showinfo("Uno", "Deck is empty and cannot be replenished. Turn skipped.")
+            self.update_ui()
+            return
+
+        self.animating = True
+        self.animate_fly(self.draw_pile, self.hand_area, lambda: self.finish_draw())
+
+    def finish_draw(self):
+        self.animating = False
+        self.update_ui()
+
+    def run_ai(self):
+        if self.animating: return
+        move = self.engine.get_ai_move()
+        if not move: return
+
+        self.animating = True
+        p = self.engine.get_current_player()
+        bot_widget = self.opponent_widgets.get(p.name, self.opponents_frame)
+
+        if move['type'] == 'play':
+            dummy = ModernCard(self.root, move['card_obj'])
+            self.animate_ai_fly(bot_widget, self.discard_container, dummy, 
+                                lambda: self.finish_play(p, move['idx'], move['color']))
+        else:
+            success = self.engine.draw_card(p) # Update backend first
+            if not success:
+                self.animating = False
+                self.update_ui()
+                return
+            self.animate_fly(self.draw_pile, bot_widget, lambda: self.finish_draw())
+
+    def animate_fly(self, start_widget, end_widget, on_complete):
+        flyer = tk.Canvas(self.root, width=80, height=120, highlightthickness=0, bg=COLORS['BG'])
+        flyer.create_rectangle(2, 2, 78, 118, fill="#e74c3c", outline="white", width=2)
+        flyer.create_oval(15, 35, 65, 85, outline="yellow", width=2)
+        flyer.create_text(40, 60, text="UNO", fill="yellow", font=("Arial Black", 12, "italic"))
+        self._do_fly(flyer, start_widget, end_widget, on_complete)
+
+    def animate_ai_fly(self, start_widget, end_widget, custom_flyer, on_complete):
+        self._do_fly(custom_flyer, start_widget, end_widget, on_complete)
+
+    def _do_fly(self, flyer, start_widget, end_widget, on_complete):
+        try:
+            sx = start_widget.winfo_rootx() - self.root.winfo_rootx()
+            sy = start_widget.winfo_rooty() - self.root.winfo_rooty()
+            ex = end_widget.winfo_rootx() - self.root.winfo_rootx()
+            ey = end_widget.winfo_rooty() - self.root.winfo_rooty()
+            sx += start_widget.winfo_width()//2 - 40
+            sy += start_widget.winfo_height()//2 - 60
+            ex += end_widget.winfo_width()//2 - 40
+            ey += end_widget.winfo_height()//2 - 60
+        except:
+            flyer.destroy()
+            on_complete()
+            return
+
+        flyer.place(x=sx, y=sy)
+        steps = 15
+        dx = (ex - sx) / steps
+        dy = (ey - sy) / steps
+
+        def step(i):
+            if i < steps:
+                flyer.place(x=sx + dx*i, y=sy + dy*i)
+                self.root.after(20, lambda: step(i+1))
+            else:
+                flyer.destroy()
+                on_complete()
+        step(0)
+
+    def sort_hand(self, key):
+        if self.animating: return
+        t = self.engine.players.head
+        human = None
+        for _ in range(3):
+            if t.data.name == "You": human = t.data
+            t = t.next
+        if human:
+            human.hand = merge_sort_hand(human.hand, key)
+            self.update_ui()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = UnoGUI(root)
+    root.mainloop()
