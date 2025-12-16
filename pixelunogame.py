@@ -1,13 +1,16 @@
 import tkinter as tk
 from tkinter import messagebox
 import random
+
+# DATA STRUCTURES
 class Node:
-    def __init__(self, data):
+    def _init_(self, data):
         self.data = data
         self.next = None
         self.prev = None
+
 class ActionQueue:
-    def __init__(self, capacity=8):
+    def _init_(self, capacity=8):
         self.items = []
         self.capacity = capacity
     def enqueue(self, item):
@@ -16,8 +19,9 @@ class ActionQueue:
         self.items.append(item)
     def get_all(self):
         return self.items
+
 class CardStack:
-    def __init__(self):
+    def _init_(self):
         self.items = []
     def push(self, item):
         self.items.append(item)
@@ -30,13 +34,14 @@ class CardStack:
             return self.items[-1]
         return None
     def is_empty(self):
-        return len(self.items) == 0 
+        return len(self.items) == 0
     def size(self):
         return len(self.items)
     def shuffle(self):
         random.shuffle(self.items)
+
 class CircularDoublyLinkedList:
-    def __init__(self):
+    def _init_(self):
         self.head = None
         self.current = None
         self.size = 0
@@ -54,24 +59,22 @@ class CircularDoublyLinkedList:
             new_node.next = self.head
             self.head.prev = new_node
         self.size += 1
-
     def get_current_player(self):
         return self.current.data
-
     def move_next(self):
         self.current = self.current.next
-
     def move_prev(self):
         self.current = self.current.prev
+
+# SORTING
 def merge_sort_hand(hand, sort_key='color'):
     if len(hand) <= 1:
         return hand
-
     mid = len(hand) // 2
     left_half = merge_sort_hand(hand[:mid], sort_key)
     right_half = merge_sort_hand(hand[mid:], sort_key)
-
     return merge(left_half, right_half, sort_key)
+
 def merge(left, right, sort_key):
     sorted_list = []
     i = j = 0
@@ -79,7 +82,6 @@ def merge(left, right, sort_key):
         if card.value.isdigit(): return int(card.value)
         mapping = {'Skip': 10, 'Reverse': 11, 'Draw2': 12, 'Wild': 13, 'Wild4': 14}
         return mapping.get(card.value, 0)
-
     while i < len(left) and j < len(right):
         condition = False
         if sort_key == 'color':
@@ -91,33 +93,32 @@ def merge(left, right, sort_key):
         else:
              if get_val_weight(left[i]) < get_val_weight(right[j]):
                  condition = True
-        
         if condition:
             sorted_list.append(left[i])
             i += 1
         else:
             sorted_list.append(right[j])
             j += 1
-
     sorted_list.extend(left[i:])
     sorted_list.extend(right[j:])
     return sorted_list
+
+# PART 3: GAME LOGIC
 class Card:
-    def __init__(self, color, value):
+    def _init_(self, color, value):
         self.color = color 
         self.value = value
-    
-    def __repr__(self):
+    def _repr_(self):
         return f"{self.color} {self.value}"
 
 class Player:
-    def __init__(self, name, is_ai=False):
+    def _init_(self, name, is_ai=False):
         self.name = name
         self.hand = [] 
         self.is_ai = is_ai
 
 class UnoEngine:
-    def __init__(self):
+    def _init_(self):
         self.deck = CardStack()
         self.discard = CardStack()
         self.players = CircularDoublyLinkedList()
@@ -126,35 +127,27 @@ class UnoEngine:
         self.game_over = False
         self.winner = None
         self.status_msg = "Game Started"
-
     def log(self, msg):
         self.logs.enqueue(msg)
-
     def initialize_game(self):
         colors = ['Red', 'Blue', 'Green', 'Yellow']
         values = [str(i) for i in range(10)] + ['Skip', 'Reverse', 'Draw2'] * 2
-        
         all_cards = []
         for c in colors:
             for v in values:
                 all_cards.append(Card(c, v))
-        
         for _ in range(4): all_cards.append(Card('Black', 'Wild'))
         for _ in range(4): all_cards.append(Card('Black', 'Wild4'))
-        
         self.deck.items = all_cards 
         self.deck.shuffle()
-
         self.players.add_player(Player("You"))
         self.players.add_player(Player("Bot 1", is_ai=True))
         self.players.add_player(Player("Bot 2", is_ai=True))
-
         curr = self.players.head
         for _ in range(3): 
             for _ in range(7): 
                 curr.data.hand.append(self.deck.pop())
             curr = curr.next
-
         first_card = self.deck.pop()
         while first_card.color == 'Black': 
             self.deck.push(first_card)
@@ -162,22 +155,18 @@ class UnoEngine:
             first_card = self.deck.pop()
         self.discard.push(first_card)
         self.log(f"Start Card: {first_card.color} {first_card.value}")
-
     def get_current_player(self):
         return self.players.get_current_player()
-
     def check_playable(self, card):
         top = self.discard.peek()
         return (card.color == top.color or 
                 card.value == top.value or 
                 card.color == 'Black')
-
     def next_turn(self):
         if self.direction == 1:
             self.players.move_next()
         else:
             self.players.move_prev()
-
     def handle_special_card(self, card):
         if card.value == 'Reverse':
             self.direction *= -1
@@ -198,10 +187,8 @@ class UnoEngine:
             for _ in range(4): victim.hand.append(self.deck.pop())
             self.log(f"{victim.name} drew 4 and skipped!")
             self.next_turn()
-
     def play_card(self, player, card_index, chosen_color=None):
         card = player.hand.pop(card_index)
-        
         if card.color == 'Black':
             if chosen_color:
                 card.color = chosen_color
@@ -210,51 +197,40 @@ class UnoEngine:
                 colors = ['Red', 'Blue', 'Green', 'Yellow']
                 card.color = random.choice(colors)
                 self.log(f"{player.name} (AI) chose {card.color}")
-
         self.discard.push(card)
         self.log(f"{player.name} played {card.value}")
-        
         self.handle_special_card(card)
-        
         if len(player.hand) == 0:
             self.game_over = True
             self.winner = player
             self.status_msg = f"{player.name} WINS!"
             return True 
-        
         self.next_turn()
         return False
-
     def draw_card(self, player):
         if self.deck.is_empty():
             if self.discard.size() > 1:
-
                 top = self.discard.pop()
                 self.deck.items = self.discard.items[:] 
                 self.discard.items = [top] 
                 self.deck.shuffle()
                 self.log("Deck Reshuffled")
             else:
-    
                 self.log("Deck Empty!")
                 self.next_turn()
-                return False 
-
+                return False
         card = self.deck.pop()
         player.hand.append(card)
         self.log(f"{player.name} drew a card")
         self.next_turn()
-        return True 
-
+        return True
     def get_ai_move(self):
         p = self.get_current_player()
         if not p.is_ai: return None
-
         playable = []
         for i, card in enumerate(p.hand):
             if self.check_playable(card):
                 playable.append(i)
-  
         if playable:
             chosen_idx = playable[0]
             card = p.hand[chosen_idx]
@@ -265,10 +241,12 @@ class UnoEngine:
                     if c.color != 'Black': counts[c.color] += 1
                 if not counts: counts = {'Red': 1} 
                 chosen_color = max(counts, key=counts.get)
-            
             return {'type': 'play', 'idx': chosen_idx, 'color': chosen_color, 'card_obj': card}
         else:
             return {'type': 'draw'}
+
+# TKINTER UI
+
 COLORS = {
     'Red': '#FF5555', 'Blue': '#5555FF', 'Green': '#55AA55', 'Yellow': '#FFAA00',
     'Black': '#333333', 'White': '#FFFFFF', 
@@ -277,8 +255,8 @@ COLORS = {
 }
 
 class ModernCard(tk.Canvas):
-    def __init__(self, master, card, width=80, height=120, command=None, state="normal"):
-        super().__init__(master, width=width, height=height, bg=COLORS['BG'], highlightthickness=0)
+    def _init_(self, master, card, width=80, height=120, command=None, state="normal"):
+        super()._init_(master, width=width, height=height, bg=COLORS['BG'], highlightthickness=0)
         self.card = card
         self.command = command
         self.state = state
@@ -292,7 +270,6 @@ class ModernCard(tk.Canvas):
             self.bind("<Button-1>", self.on_click)
             self.bind("<Enter>", self.on_hover)
             self.bind("<Leave>", self.on_leave)
-
     def draw_card(self):
         pad = 2
         self.create_rectangle(pad+3, pad+3, self.width-pad, self.height-pad, fill="white", outline="black", width=1)
@@ -308,7 +285,6 @@ class ModernCard(tk.Canvas):
         corner_font = ("Arial", 10, "bold")
         self.create_text(12, 12, text=text, fill="white", font=corner_font)
         self.create_text(self.width-12, self.height-12, text=text, fill="white", font=corner_font)
-
     def on_click(self, event):
         if self.command and self.state == "normal": self.command()
     def on_hover(self, event):
@@ -317,8 +293,8 @@ class ModernCard(tk.Canvas):
         if self.state == "normal": self.move(tk.ALL, 0, 5)
 
 class ColorChooser(tk.Toplevel):
-    def __init__(self, parent):
-        super().__init__(parent)
+    def _init_(self, parent):
+        super()._init_(parent)
         self.title("Select Color")
         self.geometry("300x120")
         self.configure(bg="#333")
@@ -336,7 +312,7 @@ class ColorChooser(tk.Toplevel):
         self.destroy()
 
 class UnoGUI:
-    def __init__(self, root):
+    def _init_(self, root):
         self.root = root
         self.root.title("UNO - DSA Edition")
         self.root.geometry("1200x800")
@@ -355,9 +331,9 @@ class UnoGUI:
         elif self.state == "WIN":
             self.draw_win_screen_content(event.width, event.height)
 
+    # START MENU (WITH HOVER)
     def show_start_menu(self):
         self.state = "MENU"
-
         self.root.update_idletasks() 
         for widget in self.root.winfo_children(): widget.destroy()
         
@@ -366,36 +342,65 @@ class UnoGUI:
         self.menu_canvas.pack(fill="both", expand=True)
         
         self.draw_menu_content(self.root.winfo_width(), self.root.winfo_height())
-        self.menu_canvas.bind("<Button-1>", self.check_menu_click)
+        
+        # Bind hover and click for the Play Button
+        self.menu_canvas.tag_bind("play_btn", "<Button-1>", self.check_menu_click)
+        self.menu_canvas.tag_bind("play_btn", "<Enter>", self.on_play_hover)
+        self.menu_canvas.tag_bind("play_btn", "<Leave>", self.on_play_leave)
 
     def draw_menu_content(self, w, h):
         if w < 100 or h < 100: return
         self.menu_canvas.delete("all")
         cx, cy = w / 2, h / 2
+
+        # Clouds
         for i in range(6):
             x = (i * 200) % w
             y = (i * 70 + 50) % (h // 2)
             self.menu_canvas.create_oval(x, y, x+150, y+60, fill="white", outline="")
             self.menu_canvas.create_oval(x+50, y-20, x+200, y+50, fill="white", outline="")
+
+        # Decoration Cards
         self.draw_pixel_card(self.menu_canvas, cx - 350, cy, COLORS['Red'], "1")
         self.draw_pixel_card(self.menu_canvas, cx - 250, cy - 100, COLORS['Yellow'], "⇄", small=True)
         self.draw_pixel_card(self.menu_canvas, cx + 250, cy, COLORS['Blue'], "+2")
-        self.draw_pixel_card(self.menu_canvas, cx + 180, cy - 120, COLORS['Green'], "⊘", small=True) 
+        self.draw_pixel_card(self.menu_canvas, cx + 180, cy - 120, COLORS['Green'], "⊘", small=True)
+
+        # Title
         title_text = "PIXEL UNO"
         self.menu_canvas.create_text(cx+5, cy - 150, text=title_text, font=("Courier New", 60, "bold"), fill="#C0C0C0")
-        self.menu_canvas.create_text(cx, cy - 155, text=title_text, font=("Courier New", 60, "bold"), fill="#FFD700") 
+        self.menu_canvas.create_text(cx, cy - 155, text=title_text, font=("Courier New", 60, "bold"), fill="#FFD700")
+
+        # Stone Play Button 
         btn_w, btn_h = 240, 80
         self.btn_x1, self.btn_y1 = cx - btn_w/2, cy + 50
         self.btn_x2, self.btn_y2 = cx + btn_w/2, cy + 50 + btn_h
 
+        # Shadow
         self.menu_canvas.create_rectangle(self.btn_x1+6, self.btn_y1+6, self.btn_x2+6, self.btn_y2+6, fill="#222", outline="")
+        # Border
         self.menu_canvas.create_rectangle(self.btn_x1, self.btn_y1, self.btn_x2, self.btn_y2, fill="#EEE", outline="#555", width=4)
-        self.menu_canvas.create_rectangle(self.btn_x1+6, self.btn_y1+6, self.btn_x2-6, self.btn_y2-6, fill="#DDD", outline="")
+        
+        # Inner Body (Tagged for hover)
+        self.menu_canvas.create_rectangle(self.btn_x1+6, self.btn_y1+6, self.btn_x2-6, self.btn_y2-6, fill="#DDD", outline="", tags=("play_btn", "play_body"))
+        
+        # Bolts
         for bx, by in [(self.btn_x1+10, self.btn_y1+10), (self.btn_x2-10, self.btn_y1+10), 
                        (self.btn_x1+10, self.btn_y2-10), (self.btn_x2-10, self.btn_y2-10)]:
              self.menu_canvas.create_oval(bx-3, by-3, bx+3, by+3, fill="#888", outline="#555")
         
-        self.menu_canvas.create_text(cx, cy + 50 + btn_h/2, text="PLAY", font=("Impact", 32), fill="#333")
+        # Text (Tagged for hover)
+        self.menu_canvas.create_text(cx, cy + 50 + btn_h/2, text="PLAY", font=("Impact", 32), fill="#333", tags=("play_btn", "play_text"))
+
+    def on_play_hover(self, event):
+        # Light up the button
+        self.menu_canvas.itemconfigure("play_body", fill="#FFF") # Brighter white
+        self.menu_canvas.itemconfigure("play_text", fill="#000") # Darker text
+
+    def on_play_leave(self, event):
+        # Reset color
+        self.menu_canvas.itemconfigure("play_body", fill="#DDD") 
+        self.menu_canvas.itemconfigure("play_text", fill="#333")
 
     def draw_pixel_card(self, canvas, x, y, color, text, small=False):
         w, h = (60, 90) if small else (100, 150)
@@ -408,9 +413,10 @@ class UnoGUI:
         canvas.create_text(x, y, text=text, fill=color, font=("Courier New", font_size, "bold"))
 
     def check_menu_click(self, event):
-        if self.btn_x1 <= event.x <= self.btn_x2 and self.btn_y1 <= event.y <= self.btn_y2:
-            self.start_game()
+        # We can just start game because the tag_bind handles collision detection for us
+        self.start_game()
 
+    # GAME SETUP & SIDEBAR MENU
     def start_game(self):
         self.state = "GAME"
         for widget in self.root.winfo_children(): widget.destroy()
@@ -433,10 +439,16 @@ class UnoGUI:
             lbl.pack(fill="x", pady=2)
             self.log_labels.append(lbl)
         
+        # Controls Section
         tk.Label(self.sidebar, text="CONTROLS", fg="white", bg=COLORS['Sidebar'], font=("Segoe UI", 12, "bold")).pack(pady=10)
         btn_style = {"bg": "#444", "fg": "white", "relief": "flat", "font": ("Segoe UI", 10)}
         tk.Button(self.sidebar, text="Sort by Color", command=lambda: self.sort_hand('color'), **btn_style).pack(fill="x", padx=20, pady=5)
         tk.Button(self.sidebar, text="Sort by Value", command=lambda: self.sort_hand('value'), **btn_style).pack(fill="x", padx=20, pady=5)
+
+        # SYSTEM SECTION (New)
+        tk.Label(self.sidebar, text="\nSYSTEM", fg="#888", bg=COLORS['Sidebar'], font=("Segoe UI", 10, "bold")).pack(pady=5)
+        tk.Button(self.sidebar, text="Main Menu", command=self.show_start_menu, bg="#663333", fg="white", relief="flat", font=("Segoe UI", 10)).pack(fill="x", padx=20, pady=5)
+        tk.Button(self.sidebar, text="Quit Game", command=self.root.quit, bg="#800000", fg="white", relief="flat", font=("Segoe UI", 10)).pack(fill="x", padx=20, pady=5)
 
         self.game_area = tk.Frame(self.root, bg=COLORS['BG'])
         self.game_area.pack(side="right", fill="both", expand=True)
@@ -447,6 +459,7 @@ class UnoGUI:
         self.center_frame = tk.Frame(self.game_area, bg=COLORS['BG'])
         self.center_frame.place(relx=0.5, rely=0.45, anchor="center")
 
+        # Draw Pile
         self.draw_pile_frame = tk.Frame(self.center_frame, bg=COLORS['BG'])
         self.draw_pile_frame.pack(side="left", padx=20)
         self.draw_pile = tk.Canvas(self.draw_pile_frame, width=120, height=160, bg=COLORS['BG'], highlightthickness=0)
@@ -483,12 +496,13 @@ class UnoGUI:
             offset = i * 2 if is_hovered else 0
             x = base_x - offset
             y = base_y - offset
-
+            
             self.draw_pile.create_rectangle(x, y, x+w, y+h, fill="#e74c3c", outline="white", width=2)
             
             if i < layers - 1 and is_hovered:
                  self.draw_pile.create_line(x+w, y+h-5, x+w, y+h-15, fill="#444", width=1)
                  self.draw_pile.create_line(x+w-5, y+h, x+w-15, y+h, fill="#444", width=1)
+
             if i == layers - 1:
                 self.draw_pile.create_oval(x+15, y+30, x+75, y+100, outline="yellow", width=2)
                 self.draw_pile.create_text(x+45, y+65, text="UNO", fill="yellow", font=("Arial Black", 14, "italic"))
@@ -550,6 +564,7 @@ class UnoGUI:
         elif curr_p.is_ai and not self.animating:
             self.root.after(1200, self.run_ai)
 
+    # WIN SCREEN (PIXELATED FONT)
     def show_win_screen(self):
         self.state = "WIN"
         self.root.update_idletasks()
@@ -566,7 +581,8 @@ class UnoGUI:
         
         sky_color = "#1a0b2e" if is_me else "#2c0505"
         self.win_canvas.configure(bg=sky_color)
-
+        
+        # Mountains
         self.draw_mountains(self.win_canvas, w, h, base_height=h-100, peak_height=200, color="#111", jaggedness=50)
         mid_col = "#4b2e83" if is_me else "#500"
         self.draw_mountains(self.win_canvas, w, h, base_height=h-50, peak_height=120, color=mid_col, jaggedness=30)
@@ -576,9 +592,10 @@ class UnoGUI:
         text_main = "YOU WIN!" if is_me else "ELIMINATED"
         text_sub = f"{winner_name} won the game!" if not is_me else "Victory is yours!"
         
-        self.win_canvas.create_text(cx+5, cy, text=text_main, font=("Impact", 100), fill="black", tags="content")
-        self.win_canvas.create_text(cx, cy, text=text_main, font=("Impact", 100), fill="white", tags="content")
-        self.win_canvas.create_text(cx, cy+120, text=text_sub, font=("Comic Sans MS", 24, "bold"), fill="white", tags="content")
+        # PIXELATED FONT: Courier New
+        self.win_canvas.create_text(cx+5, cy, text=text_main, font=("Courier New", 70, "bold"), fill="black", tags="content")
+        self.win_canvas.create_text(cx, cy, text=text_main, font=("Courier New", 70, "bold"), fill="white", tags="content")
+        self.win_canvas.create_text(cx, cy+120, text=text_sub, font=("Courier New", 20, "bold"), fill="white", tags="content")
 
         btn_w, btn_h = 250, 60
         self.ret_x1, self.ret_y1 = cx - btn_w/2, cy + 200
@@ -586,7 +603,7 @@ class UnoGUI:
         
         self.win_canvas.create_rectangle(self.ret_x1+5, self.ret_y1+5, self.ret_x2+5, self.ret_y2+5, fill="black", outline="", tags="content")
         self.win_canvas.create_rectangle(self.ret_x1, self.ret_y1, self.ret_x2, self.ret_y2, fill="#333", outline="white", width=3, tags="content")
-        self.win_canvas.create_text(cx, self.ret_y1 + btn_h/2, text="RETURN TO MENU", font=("Arial", 18, "bold"), fill="white", tags="content")
+        self.win_canvas.create_text(cx, self.ret_y1 + btn_h/2, text="RETURN TO MENU", font=("Courier New", 18, "bold"), fill="white", tags="content")
 
     def draw_mountains(self, canvas, w, h, base_height, peak_height, color, jaggedness):
         points = [0, h, 0, base_height]
@@ -623,6 +640,8 @@ class UnoGUI:
     def check_win_click(self, event):
         if self.ret_x1 <= event.x <= self.ret_x2 and self.ret_y1 <= event.y <= self.ret_y2:
             self.show_start_menu()
+
+    # INPUT & ANIMATIONS
     def on_card_click(self, idx):
         if self.animating: return
         human = self.engine.get_current_player()
@@ -735,7 +754,7 @@ class UnoGUI:
             human.hand = merge_sort_hand(human.hand, key)
             self.update_ui()
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     root = tk.Tk()
     app = UnoGUI(root)
     root.mainloop()
